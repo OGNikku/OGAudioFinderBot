@@ -13,7 +13,7 @@ const bot = new TelegramBot(token, {
 
 console.log("=================================");
 console.log("OG AUDIO FINDER BOT STARTED");
-console.log("Polling is active");
+console.log("Telegram polling is active");
 console.log("=================================");
 
 
@@ -23,15 +23,13 @@ console.log("=================================");
 
 const PAGE_SIZE = 8;
 
-// Store active searches for users
 const sessions = new Map();
 
-// Store selected language
 const languages = new Map();
 
 
 // ==================================================
-// HELPER FUNCTIONS
+// HELPERS
 // ==================================================
 
 function cleanText(text) {
@@ -40,6 +38,7 @@ function cleanText(text) {
 
 
 function shorten(text, maxLength = 55) {
+
   text = cleanText(text);
 
   if (text.length <= maxLength) {
@@ -50,7 +49,7 @@ function shorten(text, maxLength = 55) {
 }
 
 
-function getSongTitle(song) {
+function getTitle(song) {
   return song.trackName || "Unknown Track";
 }
 
@@ -74,7 +73,7 @@ async function showLanguageSelection(chatId) {
   await bot.sendMessage(
     chatId,
 
-    `🌍 Choose Your Language
+`🌍 Choose Your Language
 
 Please select your preferred language to continue using Audio Finder.
 
@@ -83,30 +82,35 @@ Choose one of the languages below:`,
     {
       reply_markup: {
         inline_keyboard: [
+
           [
             {
               text: "🇬🇧 English",
               callback_data: "lang:en"
             }
           ],
+
           [
             {
               text: "🇪🇸 Español",
               callback_data: "lang:es"
             }
           ],
+
           [
             {
               text: "🇫🇷 Français",
               callback_data: "lang:fr"
             }
           ],
+
           [
             {
               text: "🇩🇪 Deutsch",
               callback_data: "lang:de"
             }
           ]
+
         ]
       }
     }
@@ -143,18 +147,23 @@ Just type the name of the song you are looking for and Audio Finder will search 
 
 
 // ==================================================
-// START COMMAND
+// START
 // ==================================================
 
 bot.onText(/^\/start$/, async (msg) => {
 
   const chatId = msg.chat.id;
 
-  console.log("START:", chatId);
+  console.log(
+    "START:",
+    chatId
+  );
 
   try {
 
-    await showLanguageSelection(chatId);
+    await showLanguageSelection(
+      chatId
+    );
 
   } catch (error) {
 
@@ -169,10 +178,13 @@ bot.onText(/^\/start$/, async (msg) => {
 
 
 // ==================================================
-// SEARCH FUNCTION
+// SEARCH
 // ==================================================
 
-async function searchSongs(chatId, query) {
+async function searchSongs(
+  chatId,
+  query
+) {
 
   console.log(
     "SEARCH:",
@@ -180,10 +192,12 @@ async function searchSongs(chatId, query) {
     query
   );
 
+
   await bot.sendChatAction(
     chatId,
     "typing"
   );
+
 
   const url =
     "https://itunes.apple.com/search" +
@@ -193,13 +207,16 @@ async function searchSongs(chatId, query) {
     "&entity=song" +
     "&limit=50";
 
+
   const response =
     await fetch(url);
+
 
   console.log(
     "iTunes status:",
     response.status
   );
+
 
   if (!response.ok) {
 
@@ -210,15 +227,21 @@ async function searchSongs(chatId, query) {
 
   }
 
+
   const data =
     await response.json();
+
 
   let results =
     data.results || [];
 
+
   // Remove duplicate tracks
   const uniqueTracks = [];
-  const seen = new Set();
+
+  const seen =
+    new Set();
+
 
   for (const song of results) {
 
@@ -226,21 +249,29 @@ async function searchSongs(chatId, query) {
       continue;
     }
 
-    if (seen.has(song.trackId)) {
+
+    if (
+      seen.has(song.trackId)
+    ) {
       continue;
     }
 
-    seen.add(song.trackId);
 
-    uniqueTracks.push(song);
+    seen.add(
+      song.trackId
+    );
+
+
+    uniqueTracks.push(
+      song
+    );
+
   }
 
-  results = uniqueTracks;
 
-  console.log(
-    "RESULTS:",
-    results.length
-  );
+  results =
+    uniqueTracks;
+
 
   sessions.set(
     chatId,
@@ -251,12 +282,19 @@ async function searchSongs(chatId, query) {
     }
   );
 
+
+  console.log(
+    "RESULTS:",
+    results.length
+  );
+
+
   return results;
 }
 
 
 // ==================================================
-// RESULT KEYBOARD
+// RESULT BUTTONS
 // ==================================================
 
 function createResultKeyboard(
@@ -266,8 +304,10 @@ function createResultKeyboard(
 
   const keyboard = [];
 
+
   const start =
     page * PAGE_SIZE;
+
 
   const end =
     Math.min(
@@ -285,13 +325,17 @@ function createResultKeyboard(
     const song =
       results[i];
 
+
     const title =
-      getSongTitle(song);
+      getTitle(song);
+
 
     const artist =
       getArtist(song);
 
+
     keyboard.push([
+
       {
         text:
           `🎵 ${shorten(title, 32)} — ${shorten(artist, 25)}`,
@@ -299,6 +343,7 @@ function createResultKeyboard(
         callback_data:
           `song:${song.trackId}`
       }
+
     ]);
 
   }
@@ -306,12 +351,16 @@ function createResultKeyboard(
 
   const navigation = [];
 
+
   if (page > 0) {
 
     navigation.push({
+
       text: "⬅️ Previous",
+
       callback_data:
         `page:${page - 1}`
+
     });
 
   }
@@ -320,15 +369,20 @@ function createResultKeyboard(
   if (end < results.length) {
 
     navigation.push({
+
       text: "➕ More Tracks",
+
       callback_data:
         `page:${page + 1}`
+
     });
 
   }
 
 
-  if (navigation.length > 0) {
+  if (
+    navigation.length > 0
+  ) {
 
     keyboard.push(
       navigation
@@ -354,18 +408,23 @@ async function sendSearchResults(
   const session =
     sessions.get(chatId);
 
+
   if (!session) {
     return;
   }
 
+
   const results =
     session.results;
+
 
   const query =
     session.query;
 
+
   const start =
     page * PAGE_SIZE;
+
 
   const end =
     Math.min(
@@ -392,11 +451,13 @@ Showing ${start + 1}-${end} of ${total} results`;
   const options = {
 
     reply_markup: {
+
       inline_keyboard:
         createResultKeyboard(
           results,
           page
         )
+
     }
 
   };
@@ -407,12 +468,15 @@ Showing ${start + 1}-${end} of ${total} results`;
     try {
 
       await bot.editMessageText(
+
         message,
+
         {
           chat_id: chatId,
           message_id: messageId,
           ...options
         }
+
       );
 
       return;
@@ -420,7 +484,7 @@ Showing ${start + 1}-${end} of ${total} results`;
     } catch (error) {
 
       console.log(
-        "EDIT MESSAGE FAILED:",
+        "EDIT ERROR:",
         error.message
       );
 
@@ -441,14 +505,18 @@ Showing ${start + 1}-${end} of ${total} results`;
 // TRACK LOOKUP
 // ==================================================
 
-async function getTrack(trackId) {
+async function getTrack(
+  trackId
+) {
 
   const url =
     "https://itunes.apple.com/lookup?id=" +
     encodeURIComponent(trackId);
 
+
   const response =
     await fetch(url);
+
 
   if (!response.ok) {
 
@@ -459,8 +527,10 @@ async function getTrack(trackId) {
 
   }
 
+
   const data =
     await response.json();
+
 
   if (
     !data.results ||
@@ -470,12 +540,13 @@ async function getTrack(trackId) {
     return null;
   }
 
+
   return data.results[0];
 }
 
 
 // ==================================================
-// FIND TRACK FROM USER SESSION
+// FIND TRACK
 // ==================================================
 
 async function findTrack(
@@ -486,6 +557,7 @@ async function findTrack(
   const session =
     sessions.get(chatId);
 
+
   if (session) {
 
     const found =
@@ -495,75 +567,22 @@ async function findTrack(
           String(trackId)
       );
 
+
     if (found) {
       return found;
     }
 
   }
 
-  return await getTrack(trackId);
-}
 
-
-// ==================================================
-// SONG DETAILS
-// ==================================================
-
-async function sendSongDetails(
-  chatId,
-  song
-) {
-
-  const title =
-    getSongTitle(song);
-
-  const artist =
-    getArtist(song);
-
-  const album =
-    getAlbum(song);
-
-
-  const message =
-
-`🎵 ${title}
-
-👤 Artist: ${artist}
-💿 Album: ${album}
-
-🎧 Available music preview is shown below.`;
-
-
-  await bot.sendMessage(
-    chatId,
-    message,
-
-    {
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "📝 Lyrics",
-              callback_data:
-                `lyrics:${song.trackId}`
-            }
-          ],
-          [
-            {
-              text: "🔙 Back to Results",
-              callback_data:
-                "back"
-            }
-          ]
-        ]
-      }
-    }
+  return await getTrack(
+    trackId
   );
 }
 
 
 // ==================================================
-// SEND AUDIO PROPERLY
+// SEND AUDIO PLAYER
 // ==================================================
 
 async function sendAudioPreview(
@@ -573,6 +592,7 @@ async function sendAudioPreview(
 
   const preview =
     song.previewUrl;
+
 
   if (!preview) {
 
@@ -595,48 +615,102 @@ Please try another track.`
 
 
   console.log(
-    "Downloading preview:",
-    preview
+    "Downloading audio preview..."
   );
 
 
-  const response =
+  const audioResponse =
     await fetch(preview);
 
 
-  if (!response.ok) {
+  if (!audioResponse.ok) {
 
     throw new Error(
-      "Preview download failed: " +
-      response.status
+      "Audio download failed: " +
+      audioResponse.status
     );
 
   }
 
 
-  const arrayBuffer =
-    await response.arrayBuffer();
+  const audioArrayBuffer =
+    await audioResponse.arrayBuffer();
 
 
-  const buffer =
-    Buffer.from(arrayBuffer);
+  const audioBuffer =
+    Buffer.from(
+      audioArrayBuffer
+    );
 
 
   const title =
-    getSongTitle(song);
+    getTitle(song);
+
 
   const artist =
     getArtist(song);
 
 
+  // ------------------------------------------
+  // GET ALBUM ARTWORK
+  // ------------------------------------------
+
+  let thumbnailBuffer = null;
+
+
+  if (
+    song.artworkUrl100
+  ) {
+
+    try {
+
+      const artworkResponse =
+        await fetch(
+          song.artworkUrl100
+        );
+
+
+      if (
+        artworkResponse.ok
+      ) {
+
+        const artworkArrayBuffer =
+          await artworkResponse.arrayBuffer();
+
+
+        thumbnailBuffer =
+          Buffer.from(
+            artworkArrayBuffer
+          );
+
+      }
+
+    } catch (error) {
+
+      console.log(
+        "Artwork download failed:",
+        error.message
+      );
+
+    }
+
+  }
+
+
+  // ------------------------------------------
+  // FILE NAME
+  // ------------------------------------------
+
   let fileName =
     `${title} - ${artist}`;
+
 
   fileName =
     fileName.replace(
       /[\\/:*?"<>|]/g,
       ""
     );
+
 
   fileName =
     fileName.substring(
@@ -645,48 +719,67 @@ Please try another track.`
     );
 
 
-  fileName += ".m4a";
+  fileName +=
+    ".m4a";
 
 
   console.log(
-    "Uploading audio:",
+    "Uploading music player:",
     fileName
   );
+
+
+  // ------------------------------------------
+  // AUDIO PLAYER
+  // ------------------------------------------
+
+  const audioOptions = {
+
+    title: title,
+
+    performer: artist,
+
+    reply_markup: {
+
+      inline_keyboard: [
+
+        [
+          {
+            text: "📝 Lyrics",
+            callback_data:
+              `lyrics:${song.trackId}`
+          },
+
+          {
+            text: "🔎",
+            callback_data:
+              "newsearch"
+          }
+        ]
+
+      ]
+
+    }
+
+  };
+
+
+  // Add album artwork when available
+  if (thumbnailBuffer) {
+
+    audioOptions.thumbnail =
+      thumbnailBuffer;
+
+  }
 
 
   await bot.sendAudio(
 
     chatId,
 
-    buffer,
+    audioBuffer,
 
-    {
-      title: title,
-
-      performer: artist,
-
-      caption:
-        `🎵 ${title}\n👤 ${artist}`,
-
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "📝 Lyrics",
-              callback_data:
-                `lyrics:${song.trackId}`
-            }
-          ],
-          [
-            {
-              text: "🔙 Back to Results",
-              callback_data:
-                "back"
-            }
-          ]
-        ]
-      }
-    },
+    audioOptions,
 
     {
       filename: fileName,
@@ -708,7 +801,8 @@ async function sendLyrics(
 ) {
 
   const title =
-    getSongTitle(song);
+    getTitle(song);
+
 
   const artist =
     getArtist(song);
@@ -767,8 +861,9 @@ Sorry, lyrics are not available for:
       data.lyrics.trim();
 
 
-    // Telegram message limit protection
-    if (lyrics.length > 3900) {
+    if (
+      lyrics.length > 3900
+    ) {
 
       lyrics =
         lyrics.substring(
@@ -776,6 +871,7 @@ Sorry, lyrics are not available for:
           3900
         ) +
         "\n\n…";
+
     }
 
 
@@ -825,8 +921,10 @@ bot.on(
     const data =
       query.data || "";
 
+
     const chatId =
       query.message?.chat?.id;
+
 
     const messageId =
       query.message?.message_id;
@@ -845,9 +943,9 @@ bot.on(
       );
 
 
-      // ------------------------------------------
-      // LANGUAGE
-      // ------------------------------------------
+      // ==========================================
+      // ENGLISH
+      // ==========================================
 
       if (
         data === "lang:en"
@@ -863,9 +961,7 @@ bot.on(
 
           await bot.editMessageText(
 
-`🇬🇧 English selected.
-
-Welcome to Audio Finder!`,
+`🇬🇧 English selected.`,
 
             {
               chat_id: chatId,
@@ -877,7 +973,7 @@ Welcome to Audio Finder!`,
         } catch (error) {
 
           console.log(
-            "Language edit error:",
+            "LANGUAGE EDIT:",
             error.message
           );
 
@@ -888,12 +984,14 @@ Welcome to Audio Finder!`,
           chatId
         );
 
+
         return;
       }
 
 
-      // Other languages are intentionally
-      // not activated yet.
+      // ==========================================
+      // OTHER LANGUAGES
+      // ==========================================
 
       if (
         data.startsWith("lang:")
@@ -908,7 +1006,9 @@ Please select English to continue using Audio Finder.`,
 
           {
             reply_markup: {
+
               inline_keyboard: [
+
                 [
                   {
                     text: "🇬🇧 English",
@@ -916,18 +1016,22 @@ Please select English to continue using Audio Finder.`,
                       "lang:en"
                   }
                 ]
+
               ]
+
             }
+
           }
         );
+
 
         return;
       }
 
 
-      // ------------------------------------------
-      // MORE / PREVIOUS
-      // ------------------------------------------
+      // ==========================================
+      // PAGES
+      // ==========================================
 
       if (
         data.startsWith("page:")
@@ -963,9 +1067,13 @@ Please search for the song again.`
 
 
         await sendSearchResults(
+
           chatId,
+
           page,
+
           messageId
+
         );
 
 
@@ -973,9 +1081,9 @@ Please search for the song again.`
       }
 
 
-      // ------------------------------------------
+      // ==========================================
       // SONG
-      // ------------------------------------------
+      // ==========================================
 
       if (
         data.startsWith("song:")
@@ -1006,11 +1114,10 @@ Please search for the song again.`
         }
 
 
-        await sendSongDetails(
-          chatId,
-          song
-        );
-
+        // IMPORTANT:
+        // No separate song details message.
+        // Only the native Telegram audio player
+        // will be sent.
 
         try {
 
@@ -1042,9 +1149,9 @@ Please try another track.`
       }
 
 
-      // ------------------------------------------
+      // ==========================================
       // LYRICS
-      // ------------------------------------------
+      // ==========================================
 
       if (
         data.startsWith("lyrics:")
@@ -1083,9 +1190,30 @@ Please try another track.`
       }
 
 
-      // ------------------------------------------
+      // ==========================================
+      // NEW SEARCH
+      // ==========================================
+
+      if (
+        data === "newsearch"
+      ) {
+
+        await bot.sendMessage(
+          chatId,
+
+`🔎 Search for another song
+
+Simply type the song name, artist, or album you want to find.`
+        );
+
+
+        return;
+      }
+
+
+      // ==========================================
       // BACK
-      // ------------------------------------------
+      // ==========================================
 
       if (
         data === "back"
@@ -1100,7 +1228,7 @@ Please try another track.`
           await bot.sendMessage(
             chatId,
 
-`🔎 Please search for a song to see the results.`
+`🔎 Search for a song to see the results.`
           );
 
           return;
@@ -1152,6 +1280,7 @@ bot.on(
 
     const chatId =
       msg.chat.id;
+
 
     const text =
       cleanText(msg.text);
@@ -1229,7 +1358,7 @@ Please try again in a moment.`
 
 
 // ==================================================
-// TELEGRAM ERRORS
+// ERRORS
 // ==================================================
 
 bot.on(
