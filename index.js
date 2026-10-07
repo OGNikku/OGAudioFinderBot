@@ -12,165 +12,88 @@ const PAGE_SIZE = 8;
 
 const userState = new Map();
 
-
-// ======================================================
-// HELPERS
-// ======================================================
+// ==========================================
+// USER STATE
+// ==========================================
 
 function getState(chatId) {
   if (!userState.has(chatId)) {
     userState.set(chatId, {
       query: "",
       tracks: [],
-      page: 0,
-      resultsMessageId: null
+      page: 0
     });
   }
 
   return userState.get(chatId);
 }
 
+// ==========================================
+// START
+// ==========================================
 
-function resetState(chatId) {
+bot.onText(/\/start/, async (msg) => {
+  const chatId = msg.chat.id;
+
   userState.set(chatId, {
     query: "",
     tracks: [],
-    page: 0,
-    resultsMessageId: null
+    page: 0
   });
-}
 
-
-function escapeMarkdown(text = "") {
-  return String(text).replace(/([_*[\]`])/g, "\\$1");
-}
-
-
-function truncate(text = "", max = 58) {
-  text = String(text);
-
-  if (text.length <= max) {
-    return text;
-  }
-
-  return text.slice(0, max - 1) + "…";
-}
-
-
-function cleanFileName(text = "track") {
-  return String(text)
-    .replace(/[\\/:*?"<>|]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 100) || "track";
-}
-
-
-function cleanYouTubeTitle(text = "Unknown") {
-  return String(text)
-    .replace(
-      /\s*\((official|audio|video|lyric|lyrics|hd|4k)[^)]*\)/gi,
-      ""
-    )
-    .replace(
-      /\s*\[[^\]]*(official|audio|video|lyric|lyrics|hd|4k)[^\]]*\]/gi,
-      ""
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-
-// ======================================================
-// START
-// ======================================================
-
-bot.onText(/\/start(?:\s+.*)?$/, async (msg) => {
-  const chatId = msg.chat.id;
-
-  resetState(chatId);
-
-  try {
-    await bot.sendMessage(
-      chatId,
-      "🌍 *Choose your language*",
-      {
-        parse_mode: "Markdown",
-
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "🇬🇧 English",
-                callback_data: "lang_en"
-              }
-            ],
-
-            [
-              {
-                text: "🇪🇸 Español",
-                callback_data: "lang_es"
-              },
-              {
-                text: "🇫🇷 Français",
-                callback_data: "lang_fr"
-              }
-            ],
-
-            [
-              {
-                text: "🇩🇪 Deutsch",
-                callback_data: "lang_de"
-              }
-            ]
+  await bot.sendMessage(
+    chatId,
+    "🌍 *Choose your language*",
+    {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "🇬🇧 English",
+              callback_data: "lang_en"
+            }
+          ],
+          [
+            {
+              text: "🇪🇸 Español",
+              callback_data: "lang_es"
+            },
+            {
+              text: "🇫🇷 Français",
+              callback_data: "lang_fr"
+            }
+          ],
+          [
+            {
+              text: "🇩🇪 Deutsch",
+              callback_data: "lang_de"
+            }
           ]
-        }
+        ]
       }
-    );
-  } catch (error) {
-    console.error("START ERROR:", error);
-  }
+    }
+  );
 });
 
-
-// ======================================================
+// ==========================================
 // CALLBACKS
-// ======================================================
+// ==========================================
 
 bot.on("callback_query", async (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data;
 
-  const chatId =
-    query.message?.chat?.id;
+  await bot.answerCallbackQuery(query.id);
 
-  const messageId =
-    query.message?.message_id;
+  // ========================================
+  // ENGLISH
+  // ========================================
 
-  const data =
-    query.data || "";
-
-  if (!chatId) {
-    return;
-  }
-
-  try {
-    await bot.answerCallbackQuery(
-      query.id
-    );
-  } catch (_) {}
-
-
-  try {
-
-    // ----------------------------------------------------
-    // ENGLISH
-    // ----------------------------------------------------
-
-    if (data === "lang_en") {
-
-      await bot.sendMessage(
-        chatId,
-
-        `🎵 *Welcome to Audio Finder!*
+  if (data === "lang_en") {
+    await bot.sendMessage(
+      chatId,
+      `🎵 *Welcome to Audio Finder!*
 
 Your personal music discovery assistant is here.
 
@@ -188,446 +111,244 @@ Just type the name of the song you are looking for and Audio Finder will search 
 
 👑 *Owner Contact*
 👤 @OGNikku`,
-
-        {
-          parse_mode: "Markdown"
-        }
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // OTHER LANGUAGES
-    // ----------------------------------------------------
-
-    if (
-      data === "lang_es" ||
-      data === "lang_fr" ||
-      data === "lang_de"
-    ) {
-
-      await bot.sendMessage(
-        chatId,
-        "🌍 This language is coming soon.\n\nPlease select 🇬🇧 English."
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // MORE TRACKS
-    // ----------------------------------------------------
-
-    if (data === "more_tracks") {
-
-      const state =
-        getState(chatId);
-
-      if (!state.tracks.length) {
-        return;
+      {
+        parse_mode: "Markdown"
       }
-
-      state.page++;
-
-      await updateResultsMessage(
-        chatId,
-        state.resultsMessageId || messageId
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // PREVIOUS
-    // ----------------------------------------------------
-
-    if (data === "previous_tracks") {
-
-      const state =
-        getState(chatId);
-
-      if (!state.tracks.length) {
-        return;
-      }
-
-      state.page =
-        Math.max(
-          0,
-          state.page - 1
-        );
-
-      await updateResultsMessage(
-        chatId,
-        state.resultsMessageId || messageId
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // NEW SEARCH
-    // ----------------------------------------------------
-
-    if (data === "new_search") {
-
-      const state =
-        getState(chatId);
-
-      state.query = "";
-      state.tracks = [];
-      state.page = 0;
-      state.resultsMessageId = null;
-
-      await bot.sendMessage(
-        chatId,
-        "🔎 *Send me a song name, artist or album.*",
-        {
-          parse_mode: "Markdown"
-        }
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // BACK TO RESULTS
-    // ----------------------------------------------------
-
-    if (data === "back_results") {
-
-      const state =
-        getState(chatId);
-
-      if (state.resultsMessageId) {
-
-        await updateResultsMessage(
-          chatId,
-          state.resultsMessageId
-        );
-      }
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // ITUNES SONG
-    // ----------------------------------------------------
-
-    if (data.startsWith("itunes_")) {
-
-      const index =
-        Number(
-          data.slice(
-            "itunes_".length
-          )
-        );
-
-      const state =
-        getState(chatId);
-
-      const track =
-        state.tracks[index];
-
-      if (
-        !track ||
-        track.type !== "itunes"
-      ) {
-
-        await bot.sendMessage(
-          chatId,
-          "❌ Track not found."
-        );
-
-        return;
-      }
-
-      await sendTrack(
-        chatId,
-        track,
-        index
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // YOUTUBE RESULT
-    // ----------------------------------------------------
-
-    if (data.startsWith("youtube_")) {
-
-      const index =
-        Number(
-          data.slice(
-            "youtube_".length
-          )
-        );
-
-      const state =
-        getState(chatId);
-
-      const track =
-        state.tracks[index];
-
-      if (
-        !track ||
-        track.type !== "youtube"
-      ) {
-
-        await bot.sendMessage(
-          chatId,
-          "❌ YouTube result not found."
-        );
-
-        return;
-      }
-
-      await bot.sendMessage(
-        chatId,
-
-        `🎬 *${escapeMarkdown(
-          track.title
-        )}*
-
-👤 ${escapeMarkdown(
-          track.artist
-        )}
-
-Tap below to open the original YouTube result.`,
-
-        {
-          parse_mode: "Markdown",
-
-          reply_markup: {
-            inline_keyboard: [
-
-              [
-                {
-                  text: "▶️ Open on YouTube",
-                  url: track.youtubeUrl
-                }
-              ],
-
-              [
-                {
-                  text: "🔙 Back to Results",
-                  callback_data: "back_results"
-                }
-              ],
-
-              [
-                {
-                  text: "🔎 New Search",
-                  callback_data: "new_search"
-                }
-              ]
-
-            ]
-          }
-        }
-      );
-
-      return;
-    }
-
-
-    // ----------------------------------------------------
-    // LYRICS
-    // ----------------------------------------------------
-
-    if (data.startsWith("lyrics_")) {
-
-      const index =
-        Number(
-          data.slice(
-            "lyrics_".length
-          )
-        );
-
-      const state =
-        getState(chatId);
-
-      const track =
-        state.tracks[index];
-
-      if (!track) {
-
-        await bot.sendMessage(
-          chatId,
-          "❌ Track not found."
-        );
-
-        return;
-      }
-
-      await sendLyrics(
-        chatId,
-        track
-      );
-
-      return;
-    }
-
-  } catch (error) {
-
-    console.error(
-      "CALLBACK ERROR:",
-      error
     );
 
-    try {
+    return;
+  }
 
+  // ========================================
+  // OTHER LANGUAGES
+  // ========================================
+
+  if (
+    data === "lang_es" ||
+    data === "lang_fr" ||
+    data === "lang_de"
+  ) {
+    await bot.sendMessage(
+      chatId,
+      "🌍 This language is coming soon.\n\nPlease select 🇬🇧 English."
+    );
+
+    return;
+  }
+
+  // ========================================
+  // MORE TRACKS
+  // ========================================
+
+  if (data === "more_tracks") {
+    const state = getState(chatId);
+
+    state.page++;
+
+    await showResults(chatId);
+
+    return;
+  }
+
+  // ========================================
+  // PREVIOUS
+  // ========================================
+
+  if (data === "previous_tracks") {
+    const state = getState(chatId);
+
+    if (state.page > 0) {
+      state.page--;
+    }
+
+    await showResults(chatId);
+
+    return;
+  }
+
+  // ========================================
+  // NEW SEARCH
+  // ========================================
+
+  if (data === "new_search") {
+    const state = getState(chatId);
+
+    state.query = "";
+    state.tracks = [];
+    state.page = 0;
+
+    await bot.sendMessage(
+      chatId,
+      "🔎 *Send me a song name, artist or album.*",
+      {
+        parse_mode: "Markdown"
+      }
+    );
+
+    return;
+  }
+
+  // ========================================
+  // ITUNES TRACK
+  // ========================================
+
+  if (data.startsWith("itunes_")) {
+    const index = Number(
+      data.replace("itunes_", "")
+    );
+
+    const state = getState(chatId);
+    const track = state.tracks[index];
+
+    if (!track) {
       await bot.sendMessage(
         chatId,
-        "⚠️ Something went wrong. Please try again."
+        "❌ Track not found."
       );
 
-    } catch (_) {}
+      return;
+    }
+
+    await sendTrack(chatId, track);
+
+    return;
+  }
+
+  // ========================================
+  // YOUTUBE TRACK
+  // ========================================
+
+  if (data.startsWith("youtube_")) {
+    const index = Number(
+      data.replace("youtube_", "")
+    );
+
+    const state = getState(chatId);
+    const track = state.tracks[index];
+
+    if (!track) {
+      await bot.sendMessage(
+        chatId,
+        "❌ YouTube result not found."
+      );
+
+      return;
+    }
+
+    await bot.sendMessage(
+      chatId,
+      `🎬 *${escapeMarkdown(track.title)}*
+
+👤 ${escapeMarkdown(track.artist)}
+
+Tap below to open this result on YouTube.`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "▶️ Open on YouTube",
+                url: track.youtubeUrl
+              }
+            ],
+            [
+              {
+                text: "🔎 New Search",
+                callback_data: "new_search"
+              }
+            ]
+          ]
+        }
+      }
+    );
+
+    return;
+  }
+
+  // ========================================
+  // LYRICS
+  // ========================================
+
+  if (data.startsWith("lyrics_")) {
+    const index = Number(
+      data.replace("lyrics_", "")
+    );
+
+    const state = getState(chatId);
+    const track = state.tracks[index];
+
+    if (!track) {
+      await bot.sendMessage(
+        chatId,
+        "❌ Track not found."
+      );
+
+      return;
+    }
+
+    await sendLyrics(chatId, track);
+
+    return;
+  }
+
+  // ========================================
+  // BACK TO RESULTS
+  // ========================================
+
+  if (data === "back_results") {
+    await showResults(chatId);
+
+    return;
   }
 });
 
-
-// ======================================================
-// SONG SEARCH
-// ======================================================
+// ==========================================
+// MESSAGE SEARCH
+// ==========================================
 
 bot.on("message", async (msg) => {
+  if (!msg.text) return;
 
-  if (
-    !msg.text ||
-    msg.text.startsWith("/")
-  ) {
-    return;
-  }
+  if (msg.text.startsWith("/")) return;
 
-  const chatId =
-    msg.chat.id;
+  const chatId = msg.chat.id;
+  const query = msg.text.trim();
 
-  const query =
-    msg.text.trim();
+  if (!query) return;
 
-  if (!query) {
-    return;
-  }
+  const state = getState(chatId);
 
-  const state =
-    getState(chatId);
+  state.query = query;
+  state.page = 0;
 
-  state.query =
-    query;
-
-  state.page =
-    0;
-
-  state.tracks =
-    [];
-
-  state.resultsMessageId =
-    null;
-
+  await bot.sendChatAction(
+    chatId,
+    "typing"
+  );
 
   try {
-
-    await bot.sendChatAction(
-      chatId,
-      "typing"
-    );
-
-
     const [
-      itunesResult,
-      youtubeResult
-    ] = await Promise.allSettled([
-
-      searchITunes(
-        query
-      ),
-
-      searchYouTube(
-        query
-      )
-
+      itunesResults,
+      youtubeResults
+    ] = await Promise.all([
+      searchITunes(query),
+      searchYouTube(query)
     ]);
 
-
-    let itunesResults =
-      [];
-
-    let youtubeResults =
-      [];
-
-
-    if (
-      itunesResult.status ===
-      "fulfilled"
-    ) {
-
-      itunesResults =
-        itunesResult.value || [];
-
-    } else {
-
-      console.error(
-        "iTunes search error:",
-        itunesResult.reason
-      );
-    }
-
-
-    if (
-      youtubeResult.status ===
-      "fulfilled"
-    ) {
-
-      youtubeResults =
-        youtubeResult.value || [];
-
-    } else {
-
-      console.error(
-        "YouTube search error:",
-        youtubeResult.reason
-      );
-    }
-
-
-    // Music first.
-    // YouTube after music.
-
-    state.tracks = [
-
+    const combined = [
       ...itunesResults,
-
       ...youtubeResults
-
     ];
 
+    state.tracks = combined;
 
-    // ----------------------------------------------------
-    // NO RESULT
-    // ----------------------------------------------------
-
-    if (
-      !state.tracks.length
-    ) {
-
+    if (!combined.length) {
       await bot.sendMessage(
         chatId,
+        `❌ No results found for *${escapeMarkdown(query)}*.
 
-        `❌ No results found for *${escapeMarkdown(
-          query
-        )}*.
-
-Try another song, artist or album.`,
-
+Try another song or artist.`,
         {
           parse_mode: "Markdown"
         }
@@ -636,19 +357,11 @@ Try another song, artist or album.`,
       return;
     }
 
-
-    // ----------------------------------------------------
-    // SHOW RESULTS
-    // ----------------------------------------------------
-
-    await sendResultsMessage(
-      chatId
-    );
+    await showResults(chatId);
 
   } catch (error) {
-
     console.error(
-      "MAIN SEARCH ERROR:",
+      "SEARCH ERROR:",
       error
     );
 
@@ -659,519 +372,291 @@ Try another song, artist or album.`,
   }
 });
 
-
-// ======================================================
+// ==========================================
 // ITUNES SEARCH
-// ======================================================
+// ==========================================
 
-async function searchITunes(
-  query
-) {
-
+async function searchITunes(query) {
   const url =
-    `${ITUNES_API}` +
-    `?term=${encodeURIComponent(
-      query
-    )}` +
+    `${ITUNES_API}?term=${encodeURIComponent(query)}` +
     `&media=music` +
     `&entity=song` +
     `&limit=50`;
 
-
   const response =
-    await fetch(
-      url
-    );
-
+    await fetch(url);
 
   if (!response.ok) {
-
     throw new Error(
-      `iTunes HTTP ${response.status}`
+      "iTunes Search API failed"
     );
   }
-
 
   const data =
     await response.json();
 
-
-  return (
-    data.results || []
-  )
+  return data.results
     .filter(
-      (track) =>
+      track =>
         track.trackName &&
         track.artistName
     )
-    .map(
-      (track) => ({
+    .map(track => ({
+      type: "itunes",
 
-        type: "itunes",
+      id: track.trackId,
 
-        id:
-          track.trackId,
+      title:
+        track.trackName,
 
-        title:
-          track.trackName,
+      artist:
+        track.artistName,
 
-        artist:
-          track.artistName,
+      album:
+        track.collectionName ||
+        "Unknown Album",
 
-        album:
-          track.collectionName ||
-          "Unknown Album",
+      artwork:
+        track.artworkUrl100
+          ? track.artworkUrl100.replace(
+              "100x100bb",
+              "600x600bb"
+            )
+          : null,
 
-        artwork:
-          track.artworkUrl100 ||
-          null,
-
-        preview:
-          track.previewUrl ||
-          null,
-
-        duration:
-          track.trackTimeMillis
-            ? Math.floor(
-                track.trackTimeMillis /
-                1000
-              )
-            : null
-
-      })
-    );
+      preview:
+        track.previewUrl ||
+        null
+    }));
 }
 
-
-// ======================================================
+// ==========================================
 // YOUTUBE SEARCH
-// ======================================================
+// ==========================================
 
-async function searchYouTube(
-  query
-) {
-
+async function searchYouTube(query) {
   const apiKey =
     process.env.YOUTUBE_API_KEY;
 
-
   if (!apiKey) {
-
-    throw new Error(
-      "YOUTUBE_API_KEY is missing"
+    console.log(
+      "YOUTUBE_API_KEY is not configured."
     );
+
+    return [];
   }
 
-
   const url =
-    `${YOUTUBE_API}` +
-    `?part=snippet` +
-    `&q=${encodeURIComponent(
-      query
-    )}` +
+    `${YOUTUBE_API}?part=snippet` +
+    `&q=${encodeURIComponent(query)}` +
     `&type=video` +
     `&maxResults=25` +
-    `&key=${encodeURIComponent(
-      apiKey
-    )}`;
-
+    `&key=${apiKey}`;
 
   const response =
-    await fetch(
-      url
-    );
-
+    await fetch(url);
 
   if (!response.ok) {
-
     const errorText =
       await response.text();
 
-    throw new Error(
-      `YouTube HTTP ${response.status}: ${errorText}`
+    console.error(
+      "YouTube API ERROR:",
+      errorText
     );
-  }
 
+    return [];
+  }
 
   const data =
     await response.json();
 
-
-  return (
-    data.items || []
-  )
+  return (data.items || [])
     .filter(
-      (item) =>
-        item.id?.videoId &&
+      item =>
+        item.id &&
+        item.id.videoId &&
         item.snippet
     )
-    .map(
-      (item) => ({
+    .map(item => ({
+      type: "youtube",
 
-        type: "youtube",
+      id:
+        item.id.videoId,
 
-        id:
-          item.id.videoId,
+      title:
+        item.snippet.title ||
+        "Unknown",
 
-        title:
-          cleanYouTubeTitle(
-            item.snippet.title ||
-            "Unknown"
-          ),
+      artist:
+        item.snippet.channelTitle ||
+        "YouTube",
 
-        artist:
-          item.snippet.channelTitle ||
-          "YouTube",
+      album:
+        "YouTube",
 
-        album:
-          "YouTube",
+      artwork:
+        item.snippet.thumbnails?.high?.url ||
+        item.snippet.thumbnails?.medium?.url ||
+        item.snippet.thumbnails?.default?.url ||
+        null,
 
-        artwork:
-          item.snippet.thumbnails
-            ?.medium?.url ||
-          item.snippet.thumbnails
-            ?.default?.url ||
-          null,
-
-        youtubeUrl:
-          `https://www.youtube.com/watch?v=${item.id.videoId}`
-
-      })
-    );
+      youtubeUrl:
+        `https://www.youtube.com/watch?v=${item.id.videoId}`
+    }));
 }
 
+// ==========================================
+// SHOW RESULTS
+// ==========================================
 
-// ======================================================
-// FIRST RESULTS MESSAGE
-// ======================================================
-
-async function sendResultsMessage(
-  chatId
-) {
-
-  const state =
-    getState(chatId);
-
-
-  const message =
-    await bot.sendMessage(
-      chatId,
-
-      buildResultsText(
-        state
-      ),
-
-      {
-        parse_mode:
-          "Markdown",
-
-        reply_markup: {
-          inline_keyboard:
-            buildResultsKeyboard(
-              state
-            )
-        }
-      }
-    );
-
-
-  state.resultsMessageId =
-    message.message_id;
-}
-
-
-// ======================================================
-// UPDATE SAME RESULTS MESSAGE
-// ======================================================
-
-async function updateResultsMessage(
-  chatId,
-  messageId
-) {
-
-  const state =
-    getState(chatId);
-
-
-  if (
-    !messageId ||
-    !state.tracks.length
-  ) {
-    return;
-  }
-
-
-  const totalPages =
-    Math.ceil(
-      state.tracks.length /
-      PAGE_SIZE
-    );
-
-
-  state.page =
-    Math.max(
-      0,
-      Math.min(
-        state.page,
-        totalPages - 1
-      )
-    );
-
-
-  try {
-
-    await bot.editMessageText(
-
-      buildResultsText(
-        state
-      ),
-
-      {
-        chat_id:
-          chatId,
-
-        message_id:
-          messageId,
-
-        parse_mode:
-          "Markdown",
-
-        reply_markup: {
-          inline_keyboard:
-            buildResultsKeyboard(
-              state
-            )
-        }
-      }
-    );
-
-  } catch (error) {
-
-    const message =
-      String(
-        error.message || ""
-      );
-
-
-    if (
-      !message
-        .toLowerCase()
-        .includes(
-          "message is not modified"
-        )
-    ) {
-
-      console.error(
-        "RESULT MESSAGE EDIT ERROR:",
-        message
-      );
-    }
-  }
-}
-
-
-// ======================================================
-// RESULTS TEXT
-// ======================================================
-
-function buildResultsText(
-  state
-) {
-
-  const total =
-    state.tracks.length;
-
-
-  const totalPages =
-    Math.ceil(
-      total /
-      PAGE_SIZE
-    );
-
-
-  const currentPage =
-    state.page + 1;
-
-
-  return (
-
-    `🎧 *Search Results*\n\n` +
-
-    `🔎 Query: *${escapeMarkdown(
-      state.query
-    )}*\n\n` +
-
-    `🎵 Music previews\n` +
-
-    `🎬 YouTube results\n\n` +
-
-    `📄 Page ${currentPage} of ${totalPages}\n` +
-
-    `🎶 ${total} matching results\n\n` +
-
-    `👇 *Select a result:*`
-
-  );
-}
-
-
-// ======================================================
-// RESULTS KEYBOARD
-// ======================================================
-
-function buildResultsKeyboard(
-  state
-) {
+async function showResults(chatId) {
+  const state = getState(chatId);
 
   const start =
-    state.page *
-    PAGE_SIZE;
+    state.page * PAGE_SIZE;
 
+  const end =
+    start + PAGE_SIZE;
 
   const visible =
     state.tracks.slice(
       start,
-      start + PAGE_SIZE
+      end
     );
 
+  if (!visible.length) {
+    await bot.sendMessage(
+      chatId,
+      "🔚 No more tracks available.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "🔎 New Search",
+                callback_data:
+                  "new_search"
+              }
+            ]
+          ]
+        }
+      }
+    );
 
-  const keyboard =
-    [];
+    return;
+  }
 
+  const keyboard = [];
 
   visible.forEach(
-    (
-      track,
-      position
-    ) => {
-
+    (track, position) => {
       const realIndex =
-        start +
-        position;
+        start + position;
 
+      let icon = "🎵";
 
-      const icon =
-        track.type ===
-        "youtube"
-          ? "🎬"
-          : "🎵";
+      if (
+        track.type === "youtube"
+      ) {
+        icon = "🎬";
+      }
 
-
-      let label =
+      let text =
         `${icon} ${track.title}`;
-
 
       if (
         track.artist &&
-        track.artist !==
-          "YouTube"
+        track.artist.length < 35
       ) {
-
-        label +=
+        text +=
           ` — ${track.artist}`;
       }
-
 
       keyboard.push([
         {
           text:
             truncate(
-              label,
-              58
+              text,
+              60
             ),
 
           callback_data:
-            track.type ===
-            "youtube"
-
+            track.type === "youtube"
               ? `youtube_${realIndex}`
-
               : `itunes_${realIndex}`
         }
       ]);
     }
   );
 
+  const navigation = [];
 
-  // ----------------------------------------------------
-  // NAVIGATION
-  // ----------------------------------------------------
-
-  const navigation =
-    [];
-
-
-  if (
-    state.page > 0
-  ) {
-
+  if (state.page > 0) {
     navigation.push({
-      text:
-        "⬅️ Previous",
-
+      text: "⬅️ Previous",
       callback_data:
         "previous_tracks"
     });
   }
 
-
   if (
-    start +
-      PAGE_SIZE <
+    end <
     state.tracks.length
   ) {
-
     navigation.push({
-      text:
-        "➡️ More Tracks",
-
+      text: "➡️ More Tracks",
       callback_data:
         "more_tracks"
     });
   }
 
-
-  if (
-    navigation.length
-  ) {
-
+  if (navigation.length) {
     keyboard.push(
       navigation
     );
   }
 
-
-  // ----------------------------------------------------
-  // NEW SEARCH
-  // ----------------------------------------------------
-
   keyboard.push([
     {
-      text:
-        "🔎 New Search",
-
+      text: "🔎 New Search",
       callback_data:
         "new_search"
     }
   ]);
 
+  await bot.sendMessage(
+    chatId,
+    `🎧 *Search Results*
 
-  return keyboard;
+🔎 Query: *${escapeMarkdown(state.query)}*
+
+Found *${state.tracks.length}* matching results.
+
+🎵 Music previews
+🎬 YouTube results
+
+👇 Select a result:`,
+    {
+      parse_mode: "Markdown",
+
+      reply_markup: {
+        inline_keyboard:
+          keyboard
+      }
+    }
+  );
 }
 
-
-// ======================================================
-// SEND AUDIO PREVIEW
-// ======================================================
+// ==========================================
+// SEND ITUNES AUDIO
+// ==========================================
 
 async function sendTrack(
   chatId,
-  track,
-  index
+  track
 ) {
-
   if (!track.preview) {
-
     await bot.sendMessage(
       chatId,
       "⚠️ Audio preview is not available for this track."
@@ -1180,77 +665,254 @@ async function sendTrack(
     return;
   }
 
-
   try {
-
     await bot.sendChatAction(
       chatId,
       "upload_audio"
     );
 
-
-    // --------------------------------------------------
-    // GET AUDIO
-    // --------------------------------------------------
-
-    const audioResponse =
+    const response =
       await fetch(
         track.preview
       );
 
-
-    if (!audioResponse.ok) {
-
+    if (!response.ok) {
       throw new Error(
-        `Audio HTTP ${audioResponse.status}`
+        "Preview download failed"
       );
     }
 
+    const arrayBuffer =
+      await response.arrayBuffer();
 
-    const audioBuffer =
+    const buffer =
       Buffer.from(
-        await audioResponse.arrayBuffer()
+        arrayBuffer
       );
 
+    const state =
+      getState(chatId);
 
-    // --------------------------------------------------
-    // GET ARTWORK
-    // --------------------------------------------------
+    const index =
+      state.tracks.findIndex(
+        t =>
+          t.id === track.id
+      );
 
-    let artworkBuffer =
-      null;
+    await bot.sendAudio(
+      chatId,
+      buffer,
+      {
+        caption:
+          `🎵 ${track.title}\n` +
+          `👤 ${track.artist}\n` +
+          `💿 ${track.album}`,
 
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "📝 Lyrics",
+                callback_data:
+                  `lyrics_${index}`
+              }
+            ],
+            [
+              {
+                text:
+                  "🔎 Search Another Song",
 
-    if (
-      track.artwork
-    ) {
-
-      try {
-
-        const artworkResponse =
-          await fetch(
-            track.artwork
-          );
-
-
-        if (
-          artworkResponse.ok
-        ) {
-
-          artworkBuffer =
-            Buffer.from(
-              await artworkResponse.arrayBuffer()
-            );
+                callback_data:
+                  "new_search"
+              }
+            ]
+          ]
         }
+      },
+      {
+        filename:
+          `${cleanFileName(
+            track.title
+          )}.m4a`,
 
-      } catch (_) {
-
-        console.log(
-          "Artwork unavailable."
-        );
+        contentType:
+          "audio/mp4"
       }
+    );
+
+  } catch (error) {
+    console.error(
+      "AUDIO ERROR:",
+      error
+    );
+
+    await bot.sendMessage(
+      chatId,
+      "❌ Unable to play this preview right now."
+    );
+  }
+}
+
+// ==========================================
+// LYRICS
+// ==========================================
+
+async function sendLyrics(
+  chatId,
+  track
+) {
+  try {
+    await bot.sendChatAction(
+      chatId,
+      "typing"
+    );
+
+    const artist =
+      encodeURIComponent(
+        track.artist
+      );
+
+    const title =
+      encodeURIComponent(
+        track.title
+      );
+
+    const url =
+      `${LYRICS_API}/${artist}/${title}`;
+
+    const response =
+      await fetch(url);
+
+    if (!response.ok) {
+      await bot.sendMessage(
+        chatId,
+        "📝 Lyrics are not available for this track."
+      );
+
+      return;
     }
 
+    const data =
+      await response.json();
 
-    // --------------------------------------------------
-    // TELEGRAM AUDI
+    if (!data.lyrics) {
+      await bot.sendMessage(
+        chatId,
+        "📝 Lyrics are not available for this track."
+      );
+
+      return;
+    }
+
+    let lyrics =
+      data.lyrics.trim();
+
+    if (lyrics.length > 3900) {
+      lyrics =
+        lyrics.substring(
+          0,
+          3900
+        ) +
+        "\n\n...";
+    }
+
+    await bot.sendMessage(
+      chatId,
+      `📝 *${escapeMarkdown(track.title)}*
+
+👤 ${escapeMarkdown(track.artist)}
+
+${escapeMarkdown(lyrics)}`,
+      {
+        parse_mode: "Markdown",
+
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text:
+                  "🔙 Back to Results",
+
+                callback_data:
+                  "back_results"
+              }
+            ],
+            [
+              {
+                text:
+                  "🔎 New Search",
+
+                callback_data:
+                  "new_search"
+              }
+            ]
+          ]
+        }
+      }
+    );
+
+  } catch (error) {
+    console.error(
+      "LYRICS ERROR:",
+      error
+    );
+
+    await bot.sendMessage(
+      chatId,
+      "📝 Lyrics could not be loaded."
+    );
+  }
+}
+
+// ==========================================
+// HELPERS
+// ==========================================
+
+function cleanFileName(name) {
+  return name
+    .replace(
+      /[<>:"/\\|?*]/g,
+      ""
+    )
+    .substring(
+      0,
+      80
+    );
+}
+
+function truncate(
+  text,
+  max
+) {
+  if (
+    text.length <= max
+  ) {
+    return text;
+  }
+
+  return (
+    text.substring(
+      0,
+      max - 3
+    ) +
+    "..."
+  );
+}
+
+function escapeMarkdown(
+  text
+) {
+  return String(text)
+    .replace(
+      /([_*[\]()~`>#+\-=|{}.!])/g,
+      "\\$1"
+    );
+}
+
+// ==========================================
+// BOT STARTED
+// ==========================================
+
+console.log(
+  "🎵 OG Audio Finder Bot is running..."
+);
