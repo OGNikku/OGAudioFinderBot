@@ -42,7 +42,9 @@ function escapeHtml(text = "") {
 
 function truncate(text = "", max = 60) {
   text = String(text);
-  return text.length <= max ? text : text.slice(0, max - 1) + "…";
+  return text.length <= max
+    ? text
+    : text.slice(0, max - 1) + "…";
 }
 
 function cleanFileName(name = "track") {
@@ -55,8 +57,14 @@ function cleanFileName(name = "track") {
 
 function cleanYouTubeTitle(title = "Unknown") {
   return String(title)
-    .replace(/\s*\[(?:official|audio|video|lyrics?|hd|4k)[^\]]*\]/gi, "")
-    .replace(/\s*\((?:official|audio|video|lyrics?|hd|4k)[^)]*\)/gi, "")
+    .replace(
+      /\s*\[(?:official|audio|video|lyrics?|hd|4k)[^\]]*\]/gi,
+      ""
+    )
+    .replace(
+      /\s*\((?:official|audio|video|lyrics?|hd|4k)[^)]*\)/gi,
+      ""
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -79,6 +87,7 @@ function songLinkForTrack(track) {
 
 bot.onText(/\/start(?:\s+.*)?$/, async (msg) => {
   const chatId = msg.chat.id;
+
   resetState(chatId);
 
   try {
@@ -89,12 +98,28 @@ bot.onText(/\/start(?:\s+.*)?$/, async (msg) => {
         parse_mode: "HTML",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🇬🇧 English", callback_data: "lang_en" }],
             [
-              { text: "🇪🇸 Español", callback_data: "lang_es" },
-              { text: "🇫🇷 Français", callback_data: "lang_fr" }
+              {
+                text: "🇬🇧 English",
+                callback_data: "lang_en"
+              }
             ],
-            [{ text: "🇩🇪 Deutsch", callback_data: "lang_de" }]
+            [
+              {
+                text: "🇪🇸 Español",
+                callback_data: "lang_es"
+              },
+              {
+                text: "🇫🇷 Français",
+                callback_data: "lang_fr"
+              }
+            ],
+            [
+              {
+                text: "🇩🇪 Deutsch",
+                callback_data: "lang_de"
+              }
+            ]
           ]
         }
       }
@@ -120,6 +145,10 @@ bot.on("callback_query", async (query) => {
   } catch (_) {}
 
   try {
+    // ----------------------------------------------
+    // ENGLISH
+    // ----------------------------------------------
+
     if (data === "lang_en") {
       await bot.sendMessage(
         chatId,
@@ -138,22 +167,41 @@ Search any song by entering the title, artist, album name, or partial lyrics.
 Send any song name below to begin.
 
 <b>Developer &amp; Contact:</b> @OGNikku`,
-        { parse_mode: "HTML" }
+        {
+          parse_mode: "HTML"
+        }
       );
+
       return;
     }
 
-    if (data === "lang_es" || data === "lang_fr" || data === "lang_de") {
+    // ----------------------------------------------
+    // OTHER LANGUAGES
+    // ----------------------------------------------
+
+    if (
+      data === "lang_es" ||
+      data === "lang_fr" ||
+      data === "lang_de"
+    ) {
       await bot.sendMessage(
         chatId,
         "🌍 This language is coming soon.\n\nPlease select 🇬🇧 English."
       );
+
       return;
     }
 
+    // ----------------------------------------------
+    // MORE TRACKS
+    // ----------------------------------------------
+
     if (data === "more_tracks") {
       const state = getState(chatId);
-      const totalPages = Math.ceil(state.tracks.length / PAGE_SIZE);
+
+      const totalPages = Math.ceil(
+        state.tracks.length / PAGE_SIZE
+      );
 
       if (state.page < totalPages - 1) {
         state.page++;
@@ -166,6 +214,10 @@ Send any song name below to begin.
 
       return;
     }
+
+    // ----------------------------------------------
+    // PREVIOUS
+    // ----------------------------------------------
 
     if (data === "previous_tracks") {
       const state = getState(chatId);
@@ -182,6 +234,10 @@ Send any song name below to begin.
       return;
     }
 
+    // ----------------------------------------------
+    // NEW SEARCH
+    // ----------------------------------------------
+
     if (data === "new_search") {
       const state = getState(chatId);
 
@@ -193,11 +249,17 @@ Send any song name below to begin.
       await bot.sendMessage(
         chatId,
         "🔎 <b>Send me a song name, artist or album.</b>",
-        { parse_mode: "HTML" }
+        {
+          parse_mode: "HTML"
+        }
       );
 
       return;
     }
+
+    // ----------------------------------------------
+    // BACK TO RESULTS
+    // ----------------------------------------------
 
     if (data === "back_results") {
       const state = getState(chatId);
@@ -212,6 +274,10 @@ Send any song name below to begin.
       return;
     }
 
+    // ----------------------------------------------
+    // ITUNES TRACK
+    // ----------------------------------------------
+
     if (data.startsWith("itunes_")) {
       const index = Number(
         data.slice("itunes_".length)
@@ -220,17 +286,30 @@ Send any song name below to begin.
       const state = getState(chatId);
       const track = state.tracks[index];
 
-      if (!track || track.type !== "itunes") {
+      if (
+        !track ||
+        track.type !== "itunes"
+      ) {
         await bot.sendMessage(
           chatId,
           "❌ Track not found."
         );
+
         return;
       }
 
-      await sendTrack(chatId, track, index);
+      await sendTrack(
+        chatId,
+        track,
+        index
+      );
+
       return;
     }
+
+    // ----------------------------------------------
+    // YOUTUBE TRACK
+    // ----------------------------------------------
 
     if (data.startsWith("youtube_")) {
       const index = Number(
@@ -240,11 +319,15 @@ Send any song name below to begin.
       const state = getState(chatId);
       const track = state.tracks[index];
 
-      if (!track || track.type !== "youtube") {
+      if (
+        !track ||
+        track.type !== "youtube"
+      ) {
         await bot.sendMessage(
           chatId,
           "❌ YouTube result not found."
         );
+
         return;
       }
 
@@ -257,7 +340,8 @@ Send any song name below to begin.
         ]
       ];
 
-      const link = songLinkForTrack(track);
+      const link =
+        songLinkForTrack(track);
 
       if (link) {
         buttons.push([
@@ -284,7 +368,9 @@ Send any song name below to begin.
 
       await bot.sendMessage(
         chatId,
-        `🎬 <b>${escapeHtml(track.title)}</b>
+        `🎬 <b>${escapeHtml(
+          track.title
+        )}</b>
 
 👤 ${escapeHtml(track.artist)}
 
@@ -300,6 +386,10 @@ Tap below to open this result on YouTube or view available platforms.`,
       return;
     }
 
+    // ----------------------------------------------
+    // LYRICS
+    // ----------------------------------------------
+
     if (data.startsWith("lyrics_")) {
       const index = Number(
         data.slice("lyrics_".length)
@@ -313,13 +403,21 @@ Tap below to open this result on YouTube or view available platforms.`,
           chatId,
           "❌ Track not found."
         );
+
         return;
       }
 
-      await sendLyrics(chatId, track);
+      await sendLyrics(
+        chatId,
+        track
+      );
     }
+
   } catch (error) {
-    console.error("CALLBACK ERROR:", error);
+    console.error(
+      "CALLBACK ERROR:",
+      error
+    );
 
     try {
       await bot.sendMessage(
@@ -331,11 +429,16 @@ Tap below to open this result on YouTube or view available platforms.`,
 });
 
 // ======================================================
-// SEARCH MESSAGE
+// SEARCH
 // ======================================================
 
 bot.on("message", async (msg) => {
-  if (!msg.text || msg.text.startsWith("/")) return;
+  if (
+    !msg.text ||
+    msg.text.startsWith("/")
+  ) {
+    return;
+  }
 
   const chatId = msg.chat.id;
   const query = msg.text.trim();
@@ -373,14 +476,20 @@ bot.on("message", async (msg) => {
         ? youtubeResult.value
         : [];
 
-    if (itunesResult.status === "rejected") {
+    if (
+      itunesResult.status ===
+      "rejected"
+    ) {
       console.error(
         "iTunes SEARCH ERROR:",
         itunesResult.reason
       );
     }
 
-    if (youtubeResult.status === "rejected") {
+    if (
+      youtubeResult.status ===
+      "rejected"
+    ) {
       console.error(
         "YouTube SEARCH ERROR:",
         youtubeResult.reason
@@ -395,7 +504,9 @@ bot.on("message", async (msg) => {
     if (!state.tracks.length) {
       await bot.sendMessage(
         chatId,
-        `❌ No results found for <b>${escapeHtml(query)}</b>.
+        `❌ No results found for <b>${escapeHtml(
+          query
+        )}</b>.
 
 Try another song, artist or album.`,
         {
@@ -406,7 +517,9 @@ Try another song, artist or album.`,
       return;
     }
 
-    await sendResultsMessage(chatId);
+    await sendResultsMessage(
+      chatId
+    );
 
   } catch (error) {
     console.error(
@@ -427,10 +540,13 @@ Try another song, artist or album.`,
 
 async function searchITunes(query) {
   const url =
-    `${ITUNES_API}?term=${encodeURIComponent(query)}` +
+    `${ITUNES_API}?term=${encodeURIComponent(
+      query
+    )}` +
     `&media=music&entity=song&limit=50`;
 
-  const response = await fetch(url);
+  const response =
+    await fetch(url);
 
   if (!response.ok) {
     throw new Error(
@@ -438,7 +554,8 @@ async function searchITunes(query) {
     );
   }
 
-  const data = await response.json();
+  const data =
+    await response.json();
 
   return (data.results || [])
     .filter(
@@ -454,14 +571,19 @@ async function searchITunes(query) {
       album:
         track.collectionName ||
         "Unknown Album",
-      artwork: track.artworkUrl100
-        ? track.artworkUrl100.replace(
-            "100x100bb",
-            "600x600bb"
-          )
-        : null,
+
+      artwork:
+        track.artworkUrl100
+          ? track.artworkUrl100.replace(
+              "100x100bb",
+              "600x600bb"
+            )
+          : null,
+
       preview:
-        track.previewUrl || null,
+        track.previewUrl ||
+        null,
+
       duration:
         track.trackTimeMillis
           ? Math.floor(
@@ -479,8 +601,6 @@ async function searchYouTube(query) {
   const apiKey =
     process.env.YOUTUBE_API_KEY;
 
-  // YouTube is optional.
-  // iTunes continues working without this key.
   if (!apiKey) {
     console.log(
       "YOUTUBE_API_KEY is not configured; skipping YouTube search."
@@ -491,11 +611,16 @@ async function searchYouTube(query) {
 
   const url =
     `${YOUTUBE_API}?part=snippet` +
-    `&q=${encodeURIComponent(query)}` +
+    `&q=${encodeURIComponent(
+      query
+    )}` +
     `&type=video&maxResults=25` +
-    `&key=${encodeURIComponent(apiKey)}`;
+    `&key=${encodeURIComponent(
+      apiKey
+    )}`;
 
-  const response = await fetch(url);
+  const response =
+    await fetch(url);
 
   if (!response.ok) {
     const errorText =
@@ -521,19 +646,25 @@ async function searchYouTube(query) {
     .map((item) => ({
       type: "youtube",
       id: item.id.videoId,
-      title: cleanYouTubeTitle(
-        item.snippet.title ||
-          "Unknown"
-      ),
+
+      title:
+        cleanYouTubeTitle(
+          item.snippet.title ||
+            "Unknown"
+        ),
+
       artist:
         item.snippet.channelTitle ||
         "YouTube",
+
       album: "YouTube",
+
       artwork:
         item.snippet.thumbnails?.high?.url ||
         item.snippet.thumbnails?.medium?.url ||
         item.snippet.thumbnails?.default?.url ||
         null,
+
       youtubeUrl:
         `https://www.youtube.com/watch?v=${item.id.videoId}`
     }));
@@ -555,17 +686,25 @@ function buildResultsText(state) {
 
   return (
     `🎧 <b>Search Results</b>\n\n` +
-    `🔎 Query: <b>${escapeHtml(state.query)}</b>\n\n` +
+    `🔎 Query: <b>${escapeHtml(
+      state.query
+    )}</b>\n\n` +
     `🎵 Music previews\n` +
     `🎬 YouTube results\n` +
     `🌐 Official platform links where available\n\n` +
-    `📄 Page ${state.page + 1} of ${totalPages}\n` +
-    `🎶 ${state.tracks.length} matching results\n\n` +
+    `📄 Page ${
+      state.page + 1
+    } of ${totalPages}\n` +
+    `🎶 ${
+      state.tracks.length
+    } matching results\n\n` +
     `👇 <b>Select a result:</b>`
   );
 }
 
-function buildResultsKeyboard(state) {
+function buildResultsKeyboard(
+  state
+) {
   const start =
     state.page * PAGE_SIZE;
 
@@ -604,6 +743,7 @@ function buildResultsKeyboard(state) {
             label,
             60
           ),
+
           callback_data:
             track.type === "youtube"
               ? `youtube_${realIndex}`
@@ -651,7 +791,9 @@ function buildResultsKeyboard(state) {
   return keyboard;
 }
 
-async function sendResultsMessage(chatId) {
+async function sendResultsMessage(
+  chatId
+) {
   const state =
     getState(chatId);
 
@@ -661,6 +803,7 @@ async function sendResultsMessage(chatId) {
       buildResultsText(state),
       {
         parse_mode: "HTML",
+
         reply_markup: {
           inline_keyboard:
             buildResultsKeyboard(
@@ -712,7 +855,9 @@ async function updateResultsMessage(
       {
         chat_id: chatId,
         message_id: messageId,
+
         parse_mode: "HTML",
+
         reply_markup: {
           inline_keyboard:
             buildResultsKeyboard(
@@ -744,7 +889,7 @@ async function updateResultsMessage(
 }
 
 // ======================================================
-// AUDIO PREVIEW
+// AUDIO PREVIEW - FIXED
 // ======================================================
 
 async function sendTrack(
@@ -761,15 +906,86 @@ async function sendTrack(
     return;
   }
 
+  const buttons = [
+    [
+      {
+        text: "📝 Lyrics",
+        callback_data:
+          `lyrics_${index}`
+      }
+    ]
+  ];
+
+  const link =
+    songLinkForTrack(track);
+
+  if (link) {
+    buttons.push([
+      {
+        text: "🌐 All Platforms",
+        url: link
+      }
+    ]);
+  }
+
+  buttons.push([
+    {
+      text: "🔎 Search Another Song",
+      callback_data:
+        "new_search"
+    }
+  ]);
+
+  const options = {
+    title: track.title,
+
+    performer:
+      track.artist,
+
+    duration:
+      track.duration ||
+      undefined,
+
+    caption:
+      `🎵 ${track.title}\n` +
+      `👤 ${track.artist}\n` +
+      `💿 ${track.album}`,
+
+    reply_markup: {
+      inline_keyboard:
+        buttons
+    }
+  };
+
   try {
     await bot.sendChatAction(
       chatId,
       "upload_audio"
     );
 
+    /*
+     * IMPORTANT:
+     * iTunes preview files are hosted on Apple's CDN.
+     * Railway may sometimes get a CDN response that Telegram
+     * cannot directly use unless we download it correctly.
+     */
+
     const response =
       await fetch(
-        track.preview
+        track.preview,
+        {
+          method: "GET",
+
+          redirect: "follow",
+
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+
+            "Accept":
+              "audio/mp4,audio/*;q=0.9,*/*;q=0.8"
+          }
+        }
       );
 
     if (!response.ok) {
@@ -783,77 +999,17 @@ async function sendTrack(
         await response.arrayBuffer()
       );
 
-    let artworkBuffer =
-      null;
-
-    if (track.artwork) {
-      try {
-        const artworkResponse =
-          await fetch(
-            track.artwork
-          );
-
-        if (
-          artworkResponse.ok
-        ) {
-          artworkBuffer =
-            Buffer.from(
-              await artworkResponse.arrayBuffer()
-            );
-        }
-      } catch (_) {}
+    if (!buffer.length) {
+      throw new Error(
+        "Preview returned an empty file"
+      );
     }
 
-    const buttons = [];
-
-    buttons.push([
-      {
-        text: "📝 Lyrics",
-        callback_data:
-          `lyrics_${index}`
-      }
-    ]);
-
-    const link =
-      songLinkForTrack(track);
-
-    if (link) {
-      buttons.push([
-        {
-          text: "🌐 All Platforms",
-          url: link
-        }
-      ]);
-    }
-
-    buttons.push([
-      {
-        text: "🔎 Search Another Song",
-        callback_data:
-          "new_search"
-      }
-    ]);
-
-    const options = {
-      title: track.title,
-      performer: track.artist,
-      duration:
-        track.duration ||
-        undefined,
-      caption:
-        `🎵 ${track.title}\n` +
-        `👤 ${track.artist}\n` +
-        `💿 ${track.album}`,
-      reply_markup: {
-        inline_keyboard:
-          buttons
-      }
-    };
-
-    if (artworkBuffer) {
-      options.thumb =
-        artworkBuffer;
-    }
+    /*
+     * Send the downloaded audio buffer to Telegram.
+     * No thumbnail is used here because a bad thumbnail
+     * can cause the entire sendAudio request to fail.
+     */
 
     await bot.sendAudio(
       chatId,
@@ -864,166 +1020,45 @@ async function sendTrack(
           `${cleanFileName(
             track.title
           )}.m4a`,
+
         contentType:
           "audio/mp4"
       }
     );
 
-  } catch (error) {
+  } catch (bufferError) {
     console.error(
-      "AUDIO ERROR:",
-      error
+      "AUDIO BUFFER ERROR:",
+      bufferError?.stack ||
+        bufferError
     );
 
-    await bot.sendMessage(
-      chatId,
-      "❌ Unable to play this preview right now."
-    );
+    /*
+     * SECOND METHOD:
+     * If Railway cannot download the Apple preview,
+     * let Telegram fetch the public preview URL itself.
+     */
+
+    try {
+      await bot.sendAudio(
+        chatId,
+        track.preview,
+        options
+      );
+
+    } catch (directError) {
+      console.error(
+        "AUDIO DIRECT URL ERROR:",
+        directError?.stack ||
+          directError
+      );
+
+      await bot.sendMessage(
+        chatId,
+        "❌ Unable to play this preview right now. Please try another result."
+      );
+    }
   }
 }
 
-// ======================================================
-// LYRICS
-// ======================================================
-
-async function sendLyrics(
-  chatId,
-  track
-) {
-  try {
-    await bot.sendChatAction(
-      chatId,
-      "typing"
-    );
-
-    const url =
-      `${LYRICS_API}/${encodeURIComponent(
-        track.artist || ""
-      )}/${encodeURIComponent(
-        track.title || ""
-      )}`;
-
-    const response =
-      await fetch(url);
-
-    if (!response.ok) {
-      await bot.sendMessage(
-        chatId,
-        "📝 Lyrics are not available for this track."
-      );
-
-      return;
-    }
-
-    const data =
-      await response.json();
-
-    if (!data.lyrics) {
-      await bot.sendMessage(
-        chatId,
-        "📝 Lyrics are not available for this track."
-      );
-
-      return;
-    }
-
-    let lyrics =
-      String(
-        data.lyrics
-      ).trim();
-
-    if (
-      lyrics.length > 3900
-    ) {
-      lyrics =
-        lyrics.slice(
-          0,
-          3900
-        ) +
-        "\n\n…";
-    }
-
-    await bot.sendMessage(
-      chatId,
-      `📝 <b>${escapeHtml(
-        track.title
-      )}</b>\n\n` +
-        `👤 ${escapeHtml(
-          track.artist
-        )}\n\n` +
-        `${escapeHtml(
-          lyrics
-        )}`,
-      {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "🔙 Back to Results",
-                callback_data:
-                  "back_results"
-              }
-            ],
-            [
-              {
-                text: "🔎 New Search",
-                callback_data:
-                  "new_search"
-              }
-            ]
-          ]
-        }
-      }
-    );
-
-  } catch (error) {
-    console.error(
-      "LYRICS ERROR:",
-      error
-    );
-
-    await bot.sendMessage(
-      chatId,
-      "📝 Lyrics could not be loaded."
-    );
-  }
-}
-
-// ======================================================
-// ERRORS
-// ======================================================
-
-bot.on(
-  "polling_error",
-  (error) => {
-    console.error(
-      "POLLING ERROR:",
-      error.message || error
-    );
-  }
-);
-
-process.on(
-  "unhandledRejection",
-  (error) => {
-    console.error(
-      "UNHANDLED REJECTION:",
-      error
-    );
-  }
-);
-
-process.on(
-  "uncaughtException",
-  (error) => {
-    console.error(
-      "UNCAUGHT EXCEPTION:",
-      error
-    );
-  }
-);
-
-console.log(
-  "🎵 OG Audio Finder Bot is running..."
-);
+// ====
